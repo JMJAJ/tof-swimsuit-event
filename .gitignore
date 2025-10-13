@@ -34,3 +34,14 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Python scripts (keep local only)
+/scripts/
+
+# Analytics data (localhost only)
+# /analytics-data/
+# analytics-*.json
+# index.json
+
+/.vscode/
+/backup/
