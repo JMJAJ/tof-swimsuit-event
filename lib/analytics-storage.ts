@@ -306,12 +306,63 @@ export async function loadSnapshots(
     if (isStoredSnapshot(snapshot)) snapshots.push(snapshot)
   }
   
+  // Also read from local git folder for v2 (analytics-data-v2)
+  // This merges historical snapshots from repo with live blob snapshots
+  if (version === 'v2' && isVercel) {
+    const localSnapshots = await loadLocalGitSnapshots(limit)
+    // Merge and dedupe by timestamp
+    const seenTimestamps = new Set(snapshots.map(s => s.timestamp))
+    for (const snap of localSnapshots) {
+      if (!seenTimestamps.has(snap.timestamp)) {
+        snapshots.push(snap)
+        seenTimestamps.add(snap.timestamp)
+      }
+    }
+  }
+  
+  // Sort by timestamp
+  snapshots.sort((a, b) => a.timestamp - b.timestamp)
+  
   // Update cache
   if (useCache) {
     memoryCache.set(`${version}-snapshots`, snapshots)
   }
   
   return snapshots
+}
+
+// Load snapshots from local analytics-data-v2 folder (committed to git)
+async function loadLocalGitSnapshots(limit: number): Promise<StoredSnapshot[]> {
+  const { readdir, readFile } = require('fs/promises')
+  const { existsSync } = require('fs')
+  const { join } = require('path')
+  
+  const dir = join(process.cwd(), 'analytics-data-v2')
+  if (!existsSync(dir)) return []
+  
+  try {
+    const files = await readdir(dir)
+    const snapshotFiles = files
+      .filter((f: string) => isSnapshotFileName(f))
+      .sort()
+      .slice(-limit)
+    
+    const snapshots: StoredSnapshot[] = []
+    for (const file of snapshotFiles) {
+      try {
+        const content = await readFile(join(dir, file), 'utf-8')
+        const snapshot = JSON.parse(content)
+        if (isStoredSnapshot(snapshot)) {
+          snapshots.push(snapshot)
+        }
+      } catch {
+        // Skip invalid files
+      }
+    }
+    return snapshots
+  } catch {
+    return []
+  }
 }
 
 export async function loadLatestSnapshot(version: AnalyticsVersion): Promise<StoredSnapshot | null> {
@@ -324,9 +375,23 @@ export async function loadLatestSnapshot(version: AnalyticsVersion): Promise<Sto
   const storage = getStorage()
   const ids = await storage.list(version, 1)
   
-  if (ids.length === 0) return null
+  let latestFromStorage: StoredSnapshot | null = null
+  if (ids.length > 0) {
+    const latestId = ids[ids.length - 1]
+    const latest = await storage.read(version, latestId)
+    latestFromStorage = isStoredSnapshot(latest) ? latest : null
+  }
   
-  const latestId = ids[ids.length - 1]
-  const latest = await storage.read(version, latestId)
-  return isStoredSnapshot(latest) ? latest : null
+  // Also check local git folder for v2 on Vercel
+  if (version === 'v2' && isVercel) {
+    const localSnapshots = await loadLocalGitSnapshots(1)
+    const latestLocal = localSnapshots[localSnapshots.length - 1]
+    
+    // Return whichever is newer
+    if (latestLocal && (!latestFromStorage || latestLocal.timestamp > latestFromStorage.timestamp)) {
+      return latestLocal
+    }
+  }
+  
+  return latestFromStorage
 }
