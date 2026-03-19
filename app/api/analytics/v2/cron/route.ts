@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { loadLatestSnapshot, getCache } from '@/lib/analytics-storage'
-
-const MIN_REFRESH_INTERVAL_MS = 55 * 60 * 1000
+import { getCache } from '@/lib/analytics-storage'
 
 export async function GET(request: NextRequest) {
   try {
@@ -11,19 +9,6 @@ export async function GET(request: NextRequest) {
     // If CRON_SECRET is configured, require it.
     if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
       return NextResponse.json({ error: 'Unauthorized cron request' }, { status: 401 })
-    }
-
-    const latest = await loadLatestSnapshot('v2')
-    const ageMs = latest ? Date.now() - latest.timestamp : Number.POSITIVE_INFINITY
-
-    // Skip if we already have a recent snapshot to reduce free-tier usage.
-    if (ageMs < MIN_REFRESH_INTERVAL_MS) {
-      return NextResponse.json({
-        success: true,
-        skipped: true,
-        reason: 'Recent v2 snapshot already exists',
-        ageMinutes: Math.floor(ageMs / 60000),
-      })
     }
 
     const internalOrigin = process.env.VERCEL_URL
