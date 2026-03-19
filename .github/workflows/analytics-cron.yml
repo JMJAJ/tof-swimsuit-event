@@ -1,0 +1,30 @@
+name: Analytics V2 Cron
+
+on:
+  schedule:
+    # Runs every hour at minute 5
+    - cron: '5 * * * *'
+  # Allow manual trigger for testing
+  workflow_dispatch:
+
+jobs:
+  cron:
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    steps:
+      - name: Trigger V2 cron endpoint
+        run: |
+          response=$(curl -s -w "\n%{http_code}" -X GET \
+            "${{ secrets.SITE_URL }}/api/analytics/v2/cron" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json")
+          
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | sed '$d')
+          
+          echo "HTTP Status: $http_code"
+          echo "Response: $body"
+          
+          if [ "$http_code" -ne 200 ]; then
+            echo "::error::Cron request failed with status $http_code"
+            exit 1
+          fi
