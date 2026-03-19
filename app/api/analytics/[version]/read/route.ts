@@ -48,7 +48,11 @@ export async function GET(
       })
     }
 
-    await ensureFreshV2Snapshot(request)
+    // Skip auto-refresh on Vercel - rely on external cron (cron-job.org or GitHub Actions)
+    // Auto-refresh causes timeouts since collect takes 60+ seconds
+    if (process.env.VERCEL !== '1') {
+      await ensureFreshV2Snapshot(request)
+    }
 
     if (mode === 'latest') {
       const snapshot = await loadLatestSnapshot(versionKey)
