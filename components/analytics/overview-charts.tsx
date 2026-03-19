@@ -53,6 +53,16 @@ interface OverviewChartsProps {
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D', '#FF6B6B', '#4ECDC4']
 
 export function OverviewCharts({ data, latest }: OverviewChartsProps) {
+    if (!data?.length || !latest) {
+      return (
+        <Card>
+          <CardContent className="p-8 text-center text-gray-500">
+            No analytics data available. Run collection first.
+          </CardContent>
+        </Card>
+      )
+    }
+    
     const chartData = data.map(snapshot => ({
         time: new Date(snapshot.timestamp).toLocaleTimeString(),
         totalWorks: snapshot.totalWorks,

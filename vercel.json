@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/analytics/v2/cron",
+      "schedule": "5 * * * *"
+    }
+  ]
+}

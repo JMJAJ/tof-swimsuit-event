@@ -1,15 +1,24 @@
+const { PHASE_DEVELOPMENT_SERVER } = require('next/constants')
+
 /** @type {import('next').NextConfig} */
-const nextConfig = {
-  // Redirect root to analytics
+module.exports = (phase) => {
+  const isDevServer = phase === PHASE_DEVELOPMENT_SERVER
+
+  return {
+  // Redirect root to analytics v2
   async redirects() {
     return [
       {
         source: '/',
-        destination: '/analytics',
+        destination: '/analytics/v2',
         permanent: false,
       },
     ]
   },
+
+  // Prevent dev/build race conditions by isolating output directories.
+  // Dev writes to .next-dev; production build keeps .next.
+  distDir: isDevServer ? '.next-dev' : '.next',
 
   images: {
     // Reduce the number of generated image sizes
@@ -22,9 +31,13 @@ const nextConfig = {
     // Optimize formats
     formats: ['image/webp', 'image/avif'],
 
-    // Add domains if you're loading external images
-    domains: [
-      // Add your image domains here if needed
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'htface-kr-1305865668.file.myqcloud.com',
+        port: '',
+        pathname: '/img/face/**',
+      },
     ],
 
     // Disable image optimization to save quota
@@ -32,14 +45,11 @@ const nextConfig = {
   },
 
   // Performance optimizations
-  experimental: {
-    // Enable modern bundling
-    turbo: {
-      rules: {
-        '*.svg': {
-          loaders: ['@svgr/webpack'],
-          as: '*.js',
-        },
+  turbopack: {
+    rules: {
+      '*.svg': {
+        loaders: ['@svgr/webpack'],
+        as: '*.js',
       },
     },
   },
@@ -58,5 +68,4 @@ const nextConfig = {
 
   // Removed optimizeCss to fix build error
 }
-
-module.exports = nextConfig
+}

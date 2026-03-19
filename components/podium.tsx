@@ -17,12 +17,20 @@ export function Podium({ topWorks, onWorkClick, regionName, globalRanks }: Podiu
   if (topWorks.length === 0) return null
 
   const getImage = (work: Work) => {
-    try {
-      const images: ImageData[] = JSON.parse(work.image)
-      return images[0]?.url || "/placeholder.svg"
-    } catch {
-      return "/placeholder.svg"
+    if (Array.isArray(work.imageUrls) && work.imageUrls.length > 0) {
+      return work.imageUrls[0] || "/placeholder.svg"
     }
+
+    if (work.image) {
+      try {
+        const images: ImageData[] = JSON.parse(work.image)
+        return images[0]?.url || "/placeholder.svg"
+      } catch {
+        return "/placeholder.svg"
+      }
+    }
+
+    return "/placeholder.svg"
   }
 
   const medals = [Trophy, Medal, Award]

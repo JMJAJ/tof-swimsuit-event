@@ -12,8 +12,8 @@ interface ServerAnalytics {
     uniqueCreators: number
     avgTicketsPerWork: number
     topCreator: string
-    dominantTags: string[]
-    activity: 'very_active' | 'active' | 'moderate' | 'quiet'
+    dominantTags?: string[]
+    activity?: 'very_active' | 'active' | 'moderate' | 'quiet'
 }
 
 interface ServerAnalyticsProps {
@@ -126,12 +126,12 @@ export function ServerAnalyticsComponent({ servers, searchQuery, selectedRegion,
                                                 {server.region}
                                             </Badge>
                                             <Badge variant={
-                                                server.activity === 'very_active' ? 'default' :
-                                                    server.activity === 'active' ? 'secondary' :
-                                                        server.activity === 'moderate' ? 'outline' :
+                                                (server.activity || 'quiet') === 'very_active' ? 'default' :
+                                                    (server.activity || 'quiet') === 'active' ? 'secondary' :
+                                                        (server.activity || 'quiet') === 'moderate' ? 'outline' :
                                                             'destructive'
                                             } className="text-xs">
-                                                {server.activity.replace('_', ' ')}
+                                                {(server.activity || 'quiet').replace('_', ' ')}
                                             </Badge>
                                             {onServerClick && (
                                                 <Badge variant="outline" className="text-xs">
@@ -160,11 +160,16 @@ export function ServerAnalyticsComponent({ servers, searchQuery, selectedRegion,
                                         <div>
                                             <p className="text-xs text-gray-500 mb-1">Popular Categories:</p>
                                             <div className="flex flex-wrap gap-1">
-                                                {server.dominantTags.map(tag => (
+                                                {(server.dominantTags || []).map(tag => (
                                                     <Badge key={tag} variant="outline" className="text-xs">
                                                         {tag}
                                                     </Badge>
                                                 ))}
+                                                {(server.dominantTags || []).length === 0 && (
+                                                    <Badge variant="outline" className="text-xs">
+                                                        No tag data
+                                                    </Badge>
+                                                )}
                                             </div>
                                         </div>
                                     </div>

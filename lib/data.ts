@@ -13,7 +13,8 @@ export interface Work {
   roleName: string
   serverName: string
   name: string
-  image: string // JSON string containing ImageData[]
+  image?: string // JSON string containing ImageData[]
+  imageUrls?: string[]
   tagList: string
   ticket: number
 }

@@ -99,7 +99,16 @@ const getTagId = (tagName: string): string => {
     return tagMap[tagName] || tagName
 }
 
-const getFirstImageUrl = (imageString: string): string => {
+const getFirstImageUrl = (work?: Pick<PlayerWork, 'image' | 'imageUrls'>): string => {
+    if (work?.imageUrls?.length) {
+        return work.imageUrls[0] || '/placeholder.svg'
+    }
+
+    const imageString = work?.image
+    if (!imageString || typeof imageString !== 'string') {
+        return '/placeholder.svg'
+    }
+
     try {
         const images = JSON.parse(imageString)
         if (Array.isArray(images) && images.length > 0) {
@@ -299,7 +308,7 @@ export function UserExplorer({ data, filterType, filterValue, onBack }: UserExpl
                                 <div className="relative">
                                     <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800">
                                         <Image
-                                            src={getFirstImageUrl(user.bestWork.image)}
+                                            src={getFirstImageUrl(user.bestWork)}
                                             alt={user.bestWork.name}
                                             width={64}
                                             height={64}

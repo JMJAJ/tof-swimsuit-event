@@ -61,7 +61,16 @@ const getTagName = (tagId: string): string => {
     return tagMap[tagId] || `Tag-${tagId}`
 }
 
-const getFirstImageUrl = (imageString: string): string => {
+const getFirstImageUrl = (work?: Pick<PlayerWork, 'image' | 'imageUrls'>): string => {
+    if (work?.imageUrls?.length) {
+        return work.imageUrls[0] || '/placeholder.svg'
+    }
+
+    const imageString = work?.image
+    if (!imageString || typeof imageString !== 'string') {
+        return '/placeholder.svg'
+    }
+
     try {
         const images = JSON.parse(imageString)
         if (Array.isArray(images) && images.length > 0) {
@@ -108,8 +117,8 @@ export function CreatorLeaderboard({ creators, searchQuery, selectedRegion, show
                                 <div className="relative">
                                     <div className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800">
                                         <Image
-                                            src={getFirstImageUrl(creator.topWork.image)}
-                                            alt={creator.topWork.name}
+                                            src={getFirstImageUrl(creator.topWork)}
+                                            alt={creator.topWork?.name || 'Creator top work'}
                                             width={64}
                                             height={64}
                                             className="w-full h-full object-cover"
