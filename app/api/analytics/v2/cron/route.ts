@@ -30,7 +30,15 @@ export async function GET(request: NextRequest) {
       ? `https://${process.env.VERCEL_URL}`
       : request.nextUrl.origin
 
-    const response = await fetch(`${internalOrigin}/api/analytics/v2/collect`, {
+    // Build URL with bypass token for Vercel deployment protection
+    const bypassToken = process.env.VERCEL_AUTOMATION_BYPASS_SECRET
+    const collectUrl = new URL(`${internalOrigin}/api/analytics/v2/collect`)
+    if (bypassToken) {
+      collectUrl.searchParams.set('x-vercel-set-bypass-cookie', 'true')
+      collectUrl.searchParams.set('x-vercel-protection-bypass', bypassToken)
+    }
+
+    const response = await fetch(collectUrl.toString(), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
