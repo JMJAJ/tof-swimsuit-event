@@ -9,7 +9,7 @@ on:
 
 jobs:
   cron:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     steps:
       - name: Trigger V2 cron endpoint
         run: |
