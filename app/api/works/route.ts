@@ -1,5 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 
+const V2_WORKLIST_URL = "https://event.perfectworld.com/m/ht/xote/workList"
+
 // Enhanced cache with learning capabilities
 const cache = new Map<string, { data: any; timestamp: number }>()
 const CACHE_TTL = 60000 // 60 seconds - longer cache
@@ -48,7 +50,7 @@ export async function GET(request: NextRequest) {
   // Create and store the request promise for deduplication
   const requestPromise = (async () => {
     try {
-      const apiUrl = new URL("https://event.games.wanmei.com/m/ht/xote/workList")
+      const apiUrl = new URL(V2_WORKLIST_URL)
       apiUrl.searchParams.set("actId", "ht_20250910")
       apiUrl.searchParams.set("loginType", "onesdkAbroad")
       apiUrl.searchParams.set("orderBy", orderBy)
@@ -63,9 +65,11 @@ export async function GET(request: NextRequest) {
 
       const response = await fetch(apiUrl.toString(), {
         headers: {
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:148.0) Gecko/20100101 Firefox/148.0",
           "Accept": "application/json, text/plain, */*",
           "Accept-Language": "en-US,en;q=0.9",
+          "Origin": "https://tof.perfectworld.com",
+          "Referer": "https://tof.perfectworld.com/",
           "Connection": "keep-alive", // Enable connection reuse
         },
         signal: controller.signal,

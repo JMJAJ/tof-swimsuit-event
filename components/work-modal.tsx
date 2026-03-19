@@ -15,11 +15,16 @@ export function WorkModal({ work, onClose }: WorkModalProps) {
   const [currentImageType, setCurrentImageType] = useState(0)
 
   let images: ImageData[] = []
-  try {
-    images = JSON.parse(work.image)
-  } catch (e) {
-    console.error("Failed to parse image data for work:", work.id)
-    images = []
+  if (work.image) {
+    try {
+      images = JSON.parse(work.image)
+    } catch {
+      images = []
+    }
+  }
+
+  if ((!images || images.length === 0) && Array.isArray(work.imageUrls) && work.imageUrls.length > 0) {
+    images = work.imageUrls.map((url) => ({ url, width: 480, height: 480 }))
   }
 
   const currentImage = images[currentImageType] || images[0] || { url: "/placeholder.svg", width: 480, height: 480 }

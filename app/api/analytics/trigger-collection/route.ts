@@ -5,7 +5,7 @@ export async function POST(request: NextRequest) {
     console.log('🔄 Manual analytics collection triggered')
     
     // Trigger the analytics collection
-    const response = await fetch(`${request.nextUrl.origin}/api/analytics/collect`, {
+    const response = await fetch(`${request.nextUrl.origin}/api/analytics/v2/collect`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

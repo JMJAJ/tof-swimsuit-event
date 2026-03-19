@@ -1,13 +1,13 @@
 /**
  * Background analytics collector for localhost development
- * Automatically collects data every 30 minutes
+ * Automatically collects V2 data every hour
  */
 
 class AnalyticsCollector {
   private intervalId: NodeJS.Timeout | null = null
   private isRunning = false
   private isCollecting = false
-  private readonly COLLECTION_INTERVAL = 15 * 60 * 1000 // 15 minutes for comprehensive data
+  private readonly COLLECTION_INTERVAL = 60 * 60 * 1000 // 1 hour
 
   start() {
     if (this.isRunning) {
@@ -23,7 +23,7 @@ class AnalyticsCollector {
       return
     }
 
-    console.log('[Analytics] Starting comprehensive background collector (15min intervals)')
+    console.log('[Analytics] Starting v2 background collector (hourly)')
     this.isRunning = true
 
     // Don't collect immediately on start - wait for first interval
@@ -60,7 +60,7 @@ class AnalyticsCollector {
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 seconds
       
-      const response = await fetch('/api/analytics/collect', {
+      const response = await fetch('/api/analytics/v2/collect', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

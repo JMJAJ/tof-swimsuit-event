@@ -1,5 +1,5 @@
 import { SharedDashboard } from '@/components/analytics/shared-dashboard'
 
-export default function V1Page() {
+export default function LegacyPage() {
   return <SharedDashboard version="v1" />
 }

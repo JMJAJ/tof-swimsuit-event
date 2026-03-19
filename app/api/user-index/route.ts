@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server"
 
+const V2_WORKLIST_URL = "https://event.perfectworld.com/m/ht/xote/workList"
+
 // Cache the index for 5 minutes
 let cachedIndex: any = null
 let lastFetch = 0
@@ -18,7 +20,7 @@ interface UserIndex {
 }
 
 async function fetchPage(pageNo: number): Promise<any> {
-  const url = new URL("https://event.games.wanmei.com/m/ht/xote/workList")
+  const url = new URL(V2_WORKLIST_URL)
   url.searchParams.set("actId", "ht_20250910")
   url.searchParams.set("loginType", "onesdkAbroad")
   url.searchParams.set("orderBy", "id")
@@ -30,8 +32,11 @@ async function fetchPage(pageNo: number): Promise<any> {
 
   const response = await fetch(url.toString(), {
     headers: {
-      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:148.0) Gecko/20100101 Firefox/148.0",
       "Accept": "application/json, text/plain, */*",
+      "Accept-Language": "en-US,en;q=0.9",
+      "Origin": "https://tof.perfectworld.com",
+      "Referer": "https://tof.perfectworld.com/",
     },
     next: { revalidate: 300 } // Cache for 5 minutes
   })
