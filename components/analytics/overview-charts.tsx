@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area, CartesianGrid, BarChart, Bar } from 'recharts'
-import { TrendingUp, Globe, Clock, Activity } from 'lucide-react'
+import { TrendingUp, Globe, Clock, Activity, Calendar } from 'lucide-react'
 
 interface PlayerWork {
     id: number
@@ -52,6 +52,74 @@ interface OverviewChartsProps {
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D', '#FF6B6B', '#4ECDC4']
 
+// Format timestamp for multi-day display
+function formatTimeLabel(timestamp: number, allTimestamps: number[]): string {
+    const date = new Date(timestamp)
+    const now = new Date()
+    const isToday = date.toDateString() === now.toDateString()
+    const yesterday = new Date(now)
+    yesterday.setDate(yesterday.getDate() - 1)
+    const isYesterday = date.toDateString() === yesterday.toDateString()
+    
+    // Check if data spans multiple days
+    const minTime = Math.min(...allTimestamps)
+    const maxTime = Math.max(...allTimestamps)
+    const hoursDiff = (maxTime - minTime) / (1000 * 60 * 60)
+    const spansMultipleDays = hoursDiff > 24
+    
+    if (!spansMultipleDays) {
+        // Single day: just show time
+        return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+    }
+    
+    if (isToday) {
+        return `Today ${date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`
+    }
+    if (isYesterday) {
+        return `Yesterday ${date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`
+    }
+    
+    // Multi-day: show date and time
+    return date.toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric',
+        hour: '2-digit', 
+        minute: '2-digit' 
+    })
+}
+
+// Aggregate data by day if there's too many points
+function aggregateByDay(data: AnalyticsSnapshot[]): AnalyticsSnapshot[] {
+    if (data.length <= 24) return data // Keep hourly if <= 24 points
+    
+    const dayGroups: Record<string, AnalyticsSnapshot[]> = {}
+    
+    data.forEach(snapshot => {
+        const date = new Date(snapshot.timestamp)
+        const dayKey = date.toDateString()
+        if (!dayGroups[dayKey]) dayGroups[dayKey] = []
+        dayGroups[dayKey].push(snapshot)
+    })
+    
+    return Object.entries(dayGroups).map(([dayKey, snapshots]) => {
+        // Take the last snapshot of each day as the representative
+        const last = snapshots[snapshots.length - 1]
+        const first = snapshots[0]
+        
+        // Calculate daily changes
+        const dailyNewWorks = snapshots.reduce((sum, s, i) => {
+            if (i === 0) return 0
+            return sum + (s.totalWorks - snapshots[i-1].totalWorks)
+        }, 0)
+        
+        return {
+            ...last,
+            timestamp: last.timestamp,
+            dailyNewWorks: dailyNewWorks || (last.totalWorks - first.totalWorks),
+        }
+    })
+}
+
 export function OverviewCharts({ data, latest }: OverviewChartsProps) {
     if (!data?.length || !latest) {
       return (
@@ -63,13 +131,25 @@ export function OverviewCharts({ data, latest }: OverviewChartsProps) {
       )
     }
     
-    const chartData = data.map(snapshot => ({
-        time: new Date(snapshot.timestamp).toLocaleTimeString(),
+    const timestamps = data.map(s => s.timestamp)
+    const minTime = Math.min(...timestamps)
+    const maxTime = Math.max(...timestamps)
+    const hoursDiff = (maxTime - minTime) / (1000 * 60 * 60)
+    const spansMultipleDays = hoursDiff > 24
+    
+    // Aggregate by day if more than 48 hours of data
+    const displayData = hoursDiff > 48 ? aggregateByDay(data) : data
+    
+    const chartData = displayData.map(snapshot => ({
+        timestamp: snapshot.timestamp,
+        time: formatTimeLabel(snapshot.timestamp, timestamps),
+        date: new Date(snapshot.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
         totalWorks: snapshot.totalWorks,
         uniqueUsers: snapshot.uniqueUsers,
         avgVotes: snapshot.avgTicketsPerWork || 0,
         totalVotes: snapshot.allWorks ? snapshot.allWorks.reduce((sum: number, work: PlayerWork) => sum + work.ticket, 0) : 0,
-        topVotes: snapshot.allWorks ? Math.max(...snapshot.allWorks.map((work: PlayerWork) => work.ticket)) : 0
+        topVotes: snapshot.allWorks ? Math.max(...snapshot.allWorks.map((work: PlayerWork) => work.ticket)) : 0,
+        dailyNewWorks: (snapshot as any).dailyNewWorks,
     }))
 
     const regionData = latest ? (() => {

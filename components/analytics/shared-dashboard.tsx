@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { RefreshCw, Database, Users, Trophy, Server, Clock, Menu, Search } from 'lucide-react'
+import { RefreshCw, Database, Users, Trophy, Server, Clock, Menu, Search, TrendingUp, TrendingDown, Calendar, ArrowLeft, ArrowRight } from 'lucide-react'
 import { getServerRegion } from '@/lib/servers'
 import { AnalyticsVersion, ANALYTICS_VERSIONS } from '@/lib/analytics-config'
 import { VersionBadge, VersionSwitcher } from './version-switcher'
@@ -52,6 +52,26 @@ interface SharedDashboardProps {
   version: AnalyticsVersion
 }
 
+// Get today's date at midnight for filtering
+function getTodayMidnight(): number {
+  const d = new Date()
+  d.setHours(0, 0, 0, 0)
+  return d.getTime()
+}
+
+// Get date N days ago at midnight
+function getDaysAgo(days: number): number {
+  const d = new Date()
+  d.setDate(d.getDate() - days)
+  d.setHours(0, 0, 0, 0)
+  return d.getTime()
+}
+
+// Format date for display
+function formatDateShort(timestamp: number): string {
+  return new Date(timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
 export function SharedDashboard({ version }: SharedDashboardProps) {
   const config = ANALYTICS_VERSIONS[version]
   
@@ -68,6 +88,55 @@ export function SharedDashboard({ version }: SharedDashboardProps) {
   const [contentTrends, setContentTrends] = useState<any[]>([])
   const [serverAnalytics, setServerAnalytics] = useState<any[]>([])
   const [explorerMode, setExplorerMode] = useState<{ active: boolean; type: 'tag' | 'server'; value: string }>({ active: false, type: 'tag', value: '' })
+  
+  // Date range filter state
+  const [dateRange, setDateRange] = useState<{ start: number; end: number }>({ 
+    start: 0, // All time (epoch 0)
+    end: Date.now() 
+  })
+  const [selectedDaysAgo, setSelectedDaysAgo] = useState(0) // 0 = all time
+
+  // Filter data by date range
+  const filteredData = useMemo(() => {
+    return data.filter(s => s.timestamp >= dateRange.start && s.timestamp <= dateRange.end)
+  }, [data, dateRange])
+
+  // Calculate daily changes (last 24 hours)
+  const dailyStats = useMemo(() => {
+    if (data.length < 2) return null
+    
+    const now = Date.now()
+    const last24h = now - 24 * 60 * 60 * 1000
+    const last48h = now - 48 * 60 * 60 * 1000
+    
+    const last24hSnapshots = data.filter(s => s.timestamp >= last24h)
+    const prev24hSnapshots = data.filter(s => s.timestamp >= last48h && s.timestamp < last24h)
+    
+    const first24h = last24hSnapshots[0]
+    const last24hData = last24hSnapshots[last24hSnapshots.length - 1]
+    const lastPrev24h = prev24hSnapshots[prev24hSnapshots.length - 1]
+    
+    const newWorks24h = last24hData && first24h 
+      ? last24hData.totalWorks - (first24h?.totalWorks || 0)
+      : 0
+    
+    const newUsers24h = last24hData && lastPrev24h
+      ? Math.max(0, (last24hData.uniqueUsers || 0) - (lastPrev24h.uniqueUsers || 0))
+      : last24hData?.uniqueUsers || 0
+    
+    const previousTotal = lastPrev24h?.totalWorks || first24h?.totalWorks || 0
+    const growthPercent = previousTotal > 0 
+      ? ((last24hData?.totalWorks || 0) - previousTotal) / previousTotal * 100 
+      : 0
+    
+    return {
+      newWorks24h,
+      newUsers24h,
+      growthPercent,
+      prevPeriodWorks: lastPrev24h?.totalWorks,
+      hasPrevData: !!lastPrev24h
+    }
+  }, [data])
 
   const fetchData = async (mode: 'full' | 'summary' | 'latest' = 'summary') => {
     try {
@@ -216,6 +285,72 @@ export function SharedDashboard({ version }: SharedDashboardProps) {
         <main className="p-6">
           {activeSection === 'overview' && (
             <div className="space-y-6">
+              {/* Date Range Picker */}
+              <div className="flex items-center gap-4 bg-white dark:bg-gray-800 p-4 rounded-lg border">
+                <Calendar className="h-4 w-4 text-gray-500" />
+                <span className="text-sm font-medium">Date Range:</span>
+                <div className="flex gap-2">
+                  {[1, 3, 7, 14, 0].map(days => (
+                    <Button
+                      key={days}
+                      variant={selectedDaysAgo === days ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => {
+                        setSelectedDaysAgo(days)
+                        setDateRange({ start: days === 0 ? 0 : getDaysAgo(days), end: Date.now() })
+                      }}
+                    >
+                      {days === 0 ? 'All Time' : days === 1 ? 'Today' : `${days} days`}
+                    </Button>
+                  ))}
+                </div>
+                <span className="text-xs text-gray-500 ml-4">
+                  {formatDateShort(dateRange.start)} - {formatDateShort(dateRange.end)}
+                </span>
+              </div>
+
+              {/* Daily Summary Card */}
+              {dailyStats && (
+                <Card className="bg-gradient-to-r from-blue-50 to-green-50 dark:from-blue-900/20 dark:to-green-900/20 border-blue-200 dark:border-blue-800">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="p-3 bg-blue-100 dark:bg-blue-800 rounded-full">
+                          <TrendingUp className="h-6 w-6 text-blue-600 dark:text-blue-300" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">Last 24 Hours</p>
+                          <div className="flex items-center gap-3">
+                            <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                              +{dailyStats.newWorks24h.toLocaleString()} works
+                            </span>
+                            {dailyStats.growthPercent !== 0 && (
+                              <Badge variant={dailyStats.growthPercent >= 0 ? 'default' : 'destructive'} className="text-xs">
+                                {dailyStats.growthPercent >= 0 ? <TrendingUp className="h-3 w-3 mr-1" /> : <TrendingDown className="h-3 w-3 mr-1" />}
+                                {dailyStats.growthPercent >= 0 ? '+' : ''}{dailyStats.growthPercent.toFixed(1)}%
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex gap-6 text-sm">
+                        <div className="text-center">
+                          <p className="text-gray-500 dark:text-gray-400">New Creators</p>
+                          <p className="font-semibold text-green-600 dark:text-green-400">+{dailyStats.newUsers24h.toLocaleString()}</p>
+                        </div>
+                        {dailyStats.hasPrevData && (
+                          <div className="text-center">
+                            <p className="text-gray-500 dark:text-gray-400">Prev 24h</p>
+                            <p className="font-semibold text-gray-600 dark:text-gray-300">{dailyStats.prevPeriodWorks?.toLocaleString()} works</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Stats Grid */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 {[
                   { label: 'Total Works', value: latest?.totalWorks?.toLocaleString() || '0', icon: Database, color: 'blue' },
@@ -238,7 +373,7 @@ export function SharedDashboard({ version }: SharedDashboardProps) {
                   </Card>
                 ))}
               </div>
-              <OverviewCharts data={data as any} latest={latest as any} />
+              <OverviewCharts data={filteredData as any} latest={latest as any} />
             </div>
           )}
 
