@@ -34,7 +34,8 @@ function isStoredSnapshot(value: any): value is StoredSnapshot {
 // Get the data directory for a version
 function getDataDir(version: AnalyticsVersion): string {
   const folder = version === 'v1' ? 'analytics-data' : `analytics-data-${version}`
-  return join(process.cwd(), folder)
+  // Use public folder so it gets deployed to Vercel
+  return join(process.cwd(), 'public', folder)
 }
 
 // Memory cache for fast access

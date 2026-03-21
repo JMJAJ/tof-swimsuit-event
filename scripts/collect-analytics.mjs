@@ -236,7 +236,7 @@ async function main() {
   const snapshot = await collectSnapshot()
   
   // Ensure directory exists
-  const dataDir = join(process.cwd(), 'analytics-data-v2')
+  const dataDir = join(process.cwd(), 'public', 'analytics-data-v2')
   if (!existsSync(dataDir)) {
     mkdirSync(dataDir, { recursive: true })
   }
