@@ -83,14 +83,23 @@ export async function loadSnapshots(
   }
   
   const dir = getDataDir(version)
-  if (!existsSync(dir)) return []
+  console.log(`Loading snapshots from: ${dir}`)
+  console.log(`Directory exists: ${existsSync(dir)}`)
+  
+  if (!existsSync(dir)) {
+    console.log(`Directory does not exist: ${dir}`)
+    return []
+  }
   
   try {
     const files = await readdirAsync(dir)
+    console.log(`Found ${files.length} files in directory`)
     const snapshotFiles = files
       .filter(isSnapshotFileName)
       .sort()
       .slice(-limit)
+    
+    console.log(`Snapshot files: ${snapshotFiles.length}`)
     
     const snapshots: StoredSnapshot[] = []
     for (const file of snapshotFiles) {
