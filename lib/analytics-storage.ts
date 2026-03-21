@@ -226,7 +226,7 @@ class VercelBlobStorage implements StorageAdapter {
 // Memory cache for fast access
 class MemoryCache {
   private cache = new Map<string, { data: any; timestamp: number }>()
-  private ttl = 5 * 60 * 1000 // 5 minutes
+  private ttl = 60 * 60 * 1000 // 1 hour (matches cron interval)
 
   get(key: string): any | null {
     const cached = this.cache.get(key)
