@@ -1,7 +1,14 @@
 // Unified storage for analytics data
-// Works locally with filesystem, on Vercel with Blob storage
+// Reads from git-committed files in analytics-data-v2/
+// New snapshots are collected by GitHub Actions and committed to the repo
 
 import { AnalyticsVersion } from './analytics-config'
+import { readdir, readFile, existsSync } from 'fs'
+import { join } from 'path'
+import { promisify } from 'util'
+
+const readdirAsync = promisify(readdir)
+const readFileAsync = promisify(readFile)
 
 export interface StoredSnapshot {
   timestamp: number
@@ -24,203 +31,10 @@ function isStoredSnapshot(value: any): value is StoredSnapshot {
   )
 }
 
-// Check if we're in a Vercel environment
-const isVercel = process.env.VERCEL === '1'
-const isDev = process.env.NODE_ENV === 'development'
-
-// Storage interface
-interface StorageAdapter {
-  save(version: AnalyticsVersion, snapshot: StoredSnapshot): Promise<string>
-  list(version: AnalyticsVersion, limit?: number): Promise<string[]>
-  read(version: AnalyticsVersion, id: string): Promise<StoredSnapshot | null>
-  delete(version: AnalyticsVersion, id: string): Promise<void>
-}
-
-// Local filesystem storage (development)
-class LocalStorage implements StorageAdapter {
-  private getDir(version: AnalyticsVersion): string {
-    const { join } = require('path')
-    // V1 uses existing analytics-data folder, V2 uses analytics-data-v2
-    const folder = version === 'v1' ? 'analytics-data' : `analytics-data-${version}`
-    return join(process.cwd(), folder)
-  }
-
-  async save(version: AnalyticsVersion, snapshot: StoredSnapshot): Promise<string> {
-    const { writeFile, mkdir } = require('fs/promises')
-    const { existsSync } = require('fs')
-    const { join } = require('path')
-
-    const dir = this.getDir(version)
-    if (!existsSync(dir)) {
-      await mkdir(dir, { recursive: true })
-    }
-
-    const id = `snapshot-${snapshot.timestamp}.json`
-    const file = join(dir, id)
-    
-    // Compress data for storage
-    const compressed = this.compress(snapshot)
-    await writeFile(file, JSON.stringify(compressed))
-    
-    return id
-  }
-
-  async list(version: AnalyticsVersion, limit = 50): Promise<string[]> {
-    const { readdir } = require('fs/promises')
-    const { existsSync } = require('fs')
-    
-    const dir = this.getDir(version)
-    if (!existsSync(dir)) return []
-
-    const files = await readdir(dir)
-    return files
-      .filter((f: string) => isSnapshotFileName(f))
-      .sort()
-      .slice(-limit)
-  }
-
-  async read(version: AnalyticsVersion, id: string): Promise<StoredSnapshot | null> {
-    const { readFile } = require('fs/promises')
-    const { existsSync } = require('fs')
-    const { join } = require('path')
-
-    const file = join(this.getDir(version), id)
-    if (!existsSync(file)) return null
-
-    const content = await readFile(file, 'utf-8')
-    return this.decompress(JSON.parse(content))
-  }
-
-  async delete(version: AnalyticsVersion, id: string): Promise<void> {
-    const { unlink } = require('fs/promises')
-    const { existsSync } = require('fs')
-    const { join } = require('path')
-
-    const file = join(this.getDir(version), id)
-    if (existsSync(file)) {
-      await unlink(file)
-    }
-  }
-
-  private compress(snapshot: StoredSnapshot): any {
-    // Remove redundant data, keep essentials
-    const { data } = snapshot
-    return {
-      ...snapshot,
-      data: {
-        ...data,
-        // Keep allWorks but mark as compressed
-        allWorks: data.allWorks?.map((work: any) => ({
-          id: work.id,
-          htUid: work.htUid,
-          roleName: work.roleName,
-          serverName: work.serverName,
-          name: work.name,
-          tagList: work.tagList,
-          ticket: work.ticket,
-          createtime: work.createtime,
-          region: work.region,
-          tags: work.tags,
-          imageUrls: work.imageUrls, // Keep all images
-        })),
-        compressed: true,
-      }
-    }
-  }
-
-  private decompress(snapshot: any): StoredSnapshot {
-    return snapshot
-  }
-}
-
-// Vercel Blob storage (production)
-class VercelBlobStorage implements StorageAdapter {
-  private getToken(): string {
-    return process.env.BLOB_READ_WRITE_TOKEN || ''
-  }
-
-  private getPrefix(version: AnalyticsVersion): string {
-    return `analytics-${version}`
-  }
-
-  async save(version: AnalyticsVersion, snapshot: StoredSnapshot): Promise<string> {
-    const { put } = await import('@vercel/blob')
-    
-    const id = `snapshot-${snapshot.timestamp}.json`
-    const key = `${this.getPrefix(version)}/${id}`
-    
-    // Compress data
-    const compressed = {
-      ...snapshot,
-      data: {
-        ...snapshot.data,
-        allWorks: snapshot.data.allWorks?.map((work: any) => ({
-          id: work.id,
-          htUid: work.htUid,
-          roleName: work.roleName,
-          serverName: work.serverName,
-          name: work.name,
-          tagList: work.tagList,
-          ticket: work.ticket,
-          createtime: work.createtime,
-          region: work.region,
-          tags: work.tags,
-          imageUrls: work.imageUrls, // Keep all images
-        })),
-        compressed: true,
-      }
-    }
-
-    await put(key, JSON.stringify(compressed), {
-      token: this.getToken(),
-      access: 'public',
-      allowOverwrite: true,
-    })
-
-    return id
-  }
-
-  async list(version: AnalyticsVersion, limit = 50): Promise<string[]> {
-    const { list } = await import('@vercel/blob')
-    
-    const result = await list({
-      token: this.getToken(),
-      prefix: this.getPrefix(version),
-    })
-
-    return result.blobs
-      .map(blob => blob.pathname.split('/').pop() || '')
-      .filter(name => isSnapshotFileName(name))
-      .sort()
-      .slice(-limit)
-  }
-
-  async read(version: AnalyticsVersion, id: string): Promise<StoredSnapshot | null> {
-    const { head } = await import('@vercel/blob')
-    
-    const key = `${this.getPrefix(version)}/${id}`
-    
-    try {
-      const blob = await head(key, { token: this.getToken() })
-      if (!blob) return null
-      
-      // Fetch the blob content via URL
-      const response = await fetch(blob.url)
-      const text = await response.text()
-      return JSON.parse(text)
-    } catch {
-      return null
-    }
-  }
-
-  async delete(version: AnalyticsVersion, id: string): Promise<void> {
-    const { del } = await import('@vercel/blob')
-    
-    const key = `${this.getPrefix(version)}/${id}`
-    await del(key, {
-      token: this.getToken(),
-    })
-  }
+// Get the data directory for a version
+function getDataDir(version: AnalyticsVersion): string {
+  const folder = version === 'v1' ? 'analytics-data' : `analytics-data-${version}`
+  return join(process.cwd(), folder)
 }
 
 // Memory cache for fast access
@@ -249,42 +63,13 @@ class MemoryCache {
   }
 }
 
-// Export singleton storage
-let storageInstance: StorageAdapter | null = null
 const memoryCache = new MemoryCache()
-
-export function getStorage(): StorageAdapter {
-  if (!storageInstance) {
-    if (isVercel && process.env.BLOB_READ_WRITE_TOKEN) {
-      storageInstance = new VercelBlobStorage()
-    } else {
-      storageInstance = new LocalStorage()
-    }
-  }
-  return storageInstance
-}
 
 export function getCache(): MemoryCache {
   return memoryCache
 }
 
-// Utility functions
-export async function saveSnapshot(version: AnalyticsVersion, data: any): Promise<string> {
-  const storage = getStorage()
-  const snapshot: StoredSnapshot = {
-    timestamp: Date.now(),
-    version,
-    data,
-  }
-  
-  const id = await storage.save(version, snapshot)
-  
-  // Update cache
-  memoryCache.set(`${version}-latest`, data)
-  
-  return id
-}
-
+// Load snapshots from git-committed files
 export async function loadSnapshots(
   version: AnalyticsVersion, 
   options: { limit?: number; useCache?: boolean } = {}
@@ -297,60 +82,20 @@ export async function loadSnapshots(
     if (cached) return cached
   }
   
-  const storage = getStorage()
-  const ids = await storage.list(version, limit)
-  
-  const snapshots: StoredSnapshot[] = []
-  for (const id of ids) {
-    const snapshot = await storage.read(version, id)
-    if (isStoredSnapshot(snapshot)) snapshots.push(snapshot)
-  }
-  
-  // Also read from local git folder for v2 (analytics-data-v2)
-  // This merges historical snapshots from repo with live blob snapshots
-  if (version === 'v2' && isVercel) {
-    const localSnapshots = await loadLocalGitSnapshots(limit)
-    // Merge and dedupe by timestamp
-    const seenTimestamps = new Set(snapshots.map(s => s.timestamp))
-    for (const snap of localSnapshots) {
-      if (!seenTimestamps.has(snap.timestamp)) {
-        snapshots.push(snap)
-        seenTimestamps.add(snap.timestamp)
-      }
-    }
-  }
-  
-  // Sort by timestamp
-  snapshots.sort((a, b) => a.timestamp - b.timestamp)
-  
-  // Update cache
-  if (useCache) {
-    memoryCache.set(`${version}-snapshots`, snapshots)
-  }
-  
-  return snapshots
-}
-
-// Load snapshots from local analytics-data-v2 folder (committed to git)
-async function loadLocalGitSnapshots(limit: number): Promise<StoredSnapshot[]> {
-  const { readdir, readFile } = require('fs/promises')
-  const { existsSync } = require('fs')
-  const { join } = require('path')
-  
-  const dir = join(process.cwd(), 'analytics-data-v2')
+  const dir = getDataDir(version)
   if (!existsSync(dir)) return []
   
   try {
-    const files = await readdir(dir)
+    const files = await readdirAsync(dir)
     const snapshotFiles = files
-      .filter((f: string) => isSnapshotFileName(f))
+      .filter(isSnapshotFileName)
       .sort()
       .slice(-limit)
     
     const snapshots: StoredSnapshot[] = []
     for (const file of snapshotFiles) {
       try {
-        const content = await readFile(join(dir, file), 'utf-8')
+        const content = await readFileAsync(join(dir, file), 'utf-8')
         const snapshot = JSON.parse(content)
         if (isStoredSnapshot(snapshot)) {
           snapshots.push(snapshot)
@@ -359,6 +104,15 @@ async function loadLocalGitSnapshots(limit: number): Promise<StoredSnapshot[]> {
         // Skip invalid files
       }
     }
+    
+    // Sort by timestamp
+    snapshots.sort((a, b) => a.timestamp - b.timestamp)
+    
+    // Update cache
+    if (useCache) {
+      memoryCache.set(`${version}-snapshots`, snapshots)
+    }
+    
     return snapshots
   } catch {
     return []
@@ -372,26 +126,41 @@ export async function loadLatestSnapshot(version: AnalyticsVersion): Promise<Sto
     return { timestamp: Date.now(), version, data: cached }
   }
   
-  const storage = getStorage()
-  const ids = await storage.list(version, 1)
+  const snapshots = await loadSnapshots(version, { limit: 1, useCache: false })
   
-  let latestFromStorage: StoredSnapshot | null = null
-  if (ids.length > 0) {
-    const latestId = ids[ids.length - 1]
-    const latest = await storage.read(version, latestId)
-    latestFromStorage = isStoredSnapshot(latest) ? latest : null
+  if (snapshots.length === 0) return null
+  
+  const latest = snapshots[snapshots.length - 1]
+  
+  // Update cache
+  memoryCache.set(`${version}-latest`, latest.data)
+  
+  return latest
+}
+
+// Save snapshot (for local development / manual collection)
+// In production, GitHub Actions commits directly to the repo
+export async function saveSnapshot(version: AnalyticsVersion, data: any): Promise<string> {
+  const { writeFileSync, mkdirSync } = require('fs')
+  
+  const dir = getDataDir(version)
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true })
   }
   
-  // Also check local git folder for v2 on Vercel
-  if (version === 'v2' && isVercel) {
-    const localSnapshots = await loadLocalGitSnapshots(1)
-    const latestLocal = localSnapshots[localSnapshots.length - 1]
-    
-    // Return whichever is newer
-    if (latestLocal && (!latestFromStorage || latestLocal.timestamp > latestFromStorage.timestamp)) {
-      return latestLocal
-    }
+  const snapshot: StoredSnapshot = {
+    timestamp: Date.now(),
+    version,
+    data,
   }
   
-  return latestFromStorage
+  const id = `snapshot-${snapshot.timestamp}.json`
+  const file = join(dir, id)
+  writeFileSync(file, JSON.stringify(snapshot))
+  
+  // Update cache
+  memoryCache.set(`${version}-latest`, data)
+  memoryCache.clear() // Clear snapshots cache to force refresh
+  
+  return id
 }

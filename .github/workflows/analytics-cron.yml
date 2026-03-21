@@ -11,20 +11,28 @@ jobs:
   cron:
     runs-on: ubuntu-latest
     steps:
-      - name: Trigger V2 cron endpoint
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Collect analytics snapshot
         run: |
-          response=$(curl -s -w "\n%{http_code}" -X GET \
-            "${{ secrets.SITE_URL }}/api/analytics/v2/cron" \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            -H "Content-Type: application/json")
-          
-          http_code=$(echo "$response" | tail -n1)
-          body=$(echo "$response" | sed '$d')
-          
-          echo "HTTP Status: $http_code"
-          echo "Response: $body"
-          
-          if [ "$http_code" -ne 200 ]; then
-            echo "::error::Cron request failed with status $http_code"
-            exit 1
-          fi
+          # Run the collection script directly
+          node scripts/collect-analytics.mjs
+
+      - name: Commit and push snapshot
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add analytics-data-v2/
+          git diff --quiet && git diff --staged --quiet || git commit -m "chore: add analytics snapshot [skip ci]"
+          git push

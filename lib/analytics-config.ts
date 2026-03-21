@@ -56,9 +56,3 @@ export function getVersionFromPath(pathname: string): AnalyticsVersion {
   if (pathname.startsWith('/analytics/legacy')) return 'v1'
   return 'v2' // default
 }
-
-// Vercel-compatible storage using Blob
-export const BLOB_STORE_URL = process.env.BLOB_STORE_URL || ''
-
-// For local development, fall back to filesystem
-export const USE_LOCAL_STORAGE = process.env.NODE_ENV === 'development' || !process.env.BLOB_READ_WRITE_TOKEN
