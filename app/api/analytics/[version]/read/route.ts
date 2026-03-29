@@ -45,6 +45,10 @@ export async function GET(
           source: 'analytics-data',
           total: legacyData.length,
         }
+      }, {
+        headers: {
+          'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
+        },
       })
     }
 
@@ -68,7 +72,11 @@ export async function GET(
         }
       }
 
-      return NextResponse.json({ data: [snapshot.data] })
+      return NextResponse.json({ data: [snapshot.data] }, {
+        headers: {
+          'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
+        },
+      })
     }
 
     const snapshots = (await loadSnapshots(versionKey, { limit, useCache: false }))
@@ -99,6 +107,10 @@ export async function GET(
     return NextResponse.json({
       data,
       meta: { mode, version, total: data.length }
+    }, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
+      },
     })
   } catch (error) {
     console.error(`Read error (${versionKey}):`, error)

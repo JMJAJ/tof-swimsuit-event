@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
       const data = await pendingRequest
       return NextResponse.json(data, {
         headers: {
-          'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
+          'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
         },
       })
     } catch (error) {
@@ -124,7 +124,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(transformedData, {
       headers: {
-        'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120',
+        'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=600',
         'X-Response-Time': `${responseTime}ms`,
       },
     })
