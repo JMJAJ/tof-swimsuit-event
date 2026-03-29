@@ -3,41 +3,51 @@
   publish = ".next"
 
 [build.environment]
+  NETLIFY = "true"
   NETLIFY_NEXT_PLUGIN_SKIP = "false"
 
+# Explicitly tell Netlify to serve these as static files
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
-# Exclude analytics data from function bundle
-[functions]
-  included_files = ["!public/analytics-data/**", "!public/analytics-data-v2/**", "!analytics-data/**"]
-  node_bundler = "esbuild"
-
 # Serve analytics data as static files
-[[redirects]]
-  from = "/analytics-data/*"
-  to = "/analytics-data/:splat"
-  status = 200
-  force = false
-
 [[redirects]]
   from = "/analytics-data-v2/*"
   to = "/analytics-data-v2/:splat"
   status = 200
   force = false
 
-# Cache static assets aggressively
+[[redirects]]
+  from = "/analytics-data/*"
+  to = "/analytics-data/:splat"
+  status = 200
+  force = false
+
+# Cache headers
 [[headers]]
   for = "/_next/static/*"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
 [[headers]]
-  for = "/analytics-data-v2/*"
+  for = "/analytics-data-v2/*.json"
   [headers.values]
     Cache-Control = "public, max-age=300, stale-while-revalidate=600"
 
 [[headers]]
-  for = "/analytics-data/*"
+  for = "/analytics-data/*.json"
   [headers.values]
     Cache-Control = "public, max-age=300, stale-while-revalidate=600"
+
+# Image optimization
+[[redirects]]
+  from = "/_next/image"
+  query = {q = ":quality", url = ":url", w = ":width"}
+  status = 200
+  to = "/.netlify/images?url=:url&w=:width&q=:quality"
+
+[[redirects]]
+  from = "/_ipx/*"
+  query = {q = ":quality", url = ":url", w = ":width"}
+  status = 200
+  to = "/.netlify/images?url=:url&w=:width&q=:quality"
