@@ -231,6 +231,17 @@ async function collectSnapshot() {
 }
 
 async function main() {
+  // Event ends: March 30, 2026 5:00 AM Berlin (CEST = UTC+2) = 03:00 UTC
+  const EVENT_END = new Date('2026-03-30T03:00:00Z')
+  const now = new Date()
+  
+  if (now >= EVENT_END) {
+    console.log(`Event has ended at ${EVENT_END.toISOString()} (current: ${now.toISOString()})`)
+    console.log('Skipping collection - no more snapshots will be created.')
+    process.exit(0)
+  }
+  
+  console.log(`Event still active (current: ${now.toISOString()}, ends: ${EVENT_END.toISOString()})`)
   console.log('Starting analytics collection...')
   
   const snapshot = await collectSnapshot()

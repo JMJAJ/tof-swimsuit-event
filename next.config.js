@@ -61,6 +61,18 @@ module.exports = (phase) => {
       // Enable gzip compression
       config.optimization.minimize = true
     }
+    
+    // Exclude analytics data from server bundle (for Netlify)
+    if (isServer) {
+      config.externals = config.externals || []
+      if (Array.isArray(config.externals)) {
+        config.externals.push({
+          'public/analytics-data': 'commonjs public/analytics-data',
+          'public/analytics-data-v2': 'commonjs public/analytics-data-v2',
+        })
+      }
+    }
+    
     return config
   },
 

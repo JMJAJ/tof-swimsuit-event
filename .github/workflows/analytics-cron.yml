@@ -13,26 +13,49 @@ permissions:
 jobs:
   cron:
     runs-on: ubuntu-latest
+    # Stop collecting after event ends: March 30, 2026 5:00 AM Berlin time (03:00 UTC)
+    if: ${{ github.event_name == 'workflow_dispatch' || github.run_number == 1 || vars.EVENT_ENDED != 'true' }}
     steps:
+      - name: Check if event has ended
+        id: check-event
+        run: |
+          # Event ends: March 30, 2026 5:00 AM Berlin (CEST = UTC+2) = 03:00 UTC
+          EVENT_END="2026-03-30T03:00:00Z"
+          CURRENT_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          
+          if [[ "$CURRENT_TIME" > "$EVENT_END" ]]; then
+            echo "Event has ended at $EVENT_END (current: $CURRENT_TIME)"
+            echo "event_ended=true" >> $GITHUB_OUTPUT
+            echo "EVENT_ENDED=true" >> $GITHUB_ENV
+          else
+            echo "Event still active (current: $CURRENT_TIME, ends: $EVENT_END)"
+            echo "event_ended=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Checkout repo
+        if: steps.check-event.outputs.event_ended != 'true'
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Node.js
+        if: steps.check-event.outputs.event_ended != 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
       - name: Install dependencies
+        if: steps.check-event.outputs.event_ended != 'true'
         run: npm ci
 
       - name: Collect analytics snapshot
+        if: steps.check-event.outputs.event_ended != 'true'
         run: |
           # Run the collection script directly
           node scripts/collect-analytics.mjs
 
       - name: Commit and push snapshot
+        if: steps.check-event.outputs.event_ended != 'true'
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"

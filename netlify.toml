@@ -1,0 +1,43 @@
+[build]
+  command = "npm run build"
+  publish = ".next"
+
+[build.environment]
+  NETLIFY_NEXT_PLUGIN_SKIP = "false"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# Exclude analytics data from function bundle
+[functions]
+  included_files = ["!public/analytics-data/**", "!public/analytics-data-v2/**", "!analytics-data/**"]
+  node_bundler = "esbuild"
+
+# Serve analytics data as static files
+[[redirects]]
+  from = "/analytics-data/*"
+  to = "/analytics-data/:splat"
+  status = 200
+  force = false
+
+[[redirects]]
+  from = "/analytics-data-v2/*"
+  to = "/analytics-data-v2/:splat"
+  status = 200
+  force = false
+
+# Cache static assets aggressively
+[[headers]]
+  for = "/_next/static/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/analytics-data-v2/*"
+  [headers.values]
+    Cache-Control = "public, max-age=300, stale-while-revalidate=600"
+
+[[headers]]
+  for = "/analytics-data/*"
+  [headers.values]
+    Cache-Control = "public, max-age=300, stale-while-revalidate=600"
