@@ -1,3 +1,0 @@
-public/analytics-data-v2/*.json filter=lfs diff=lfs merge=lfs -text
-public/analytics-data-v2/*.json !text !filter !merge !diff
-public/analytics-data/*.json !text !filter !merge !diff

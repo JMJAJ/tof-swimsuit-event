@@ -10,10 +10,6 @@ import { promisify } from 'util'
 const readdirAsync = promisify(readdir)
 const readFileAsync = promisify(readFile)
 
-// GitHub raw content URL for Netlify (avoids bundling large files)
-const GITHUB_RAW_BASE = 'https://raw.githubusercontent.com/JMJAJ/tof-swimsuit-event/main'
-const isNetlify = process.env.NETLIFY === 'true'
-
 export interface StoredSnapshot {
   timestamp: number
   version: AnalyticsVersion
@@ -40,58 +36,6 @@ function getDataDir(version: AnalyticsVersion): string {
   const folder = version === 'v1' ? 'analytics-data' : `analytics-data-${version}`
   // Use public folder so it gets deployed to Vercel
   return join(process.cwd(), 'public', folder)
-}
-
-// Get GitHub raw URL for a file
-function getGitHubRawUrl(version: AnalyticsVersion, filename: string): string {
-  const folder = version === 'v1' ? 'analytics-data' : `analytics-data-${version}`
-  return `${GITHUB_RAW_BASE}/public/${folder}/${filename}`
-}
-
-// Fetch file content (from GitHub raw on Netlify, local file otherwise)
-async function fetchFileContent(version: AnalyticsVersion, filename: string): Promise<string | null> {
-  if (isNetlify) {
-    // Fetch from GitHub raw URL on Netlify
-    const url = getGitHubRawUrl(version, filename)
-    try {
-      const response = await fetch(url)
-      if (!response.ok) {
-        console.log(`GitHub raw error: ${response.status} for ${url}`)
-        return null
-      }
-      return await response.text()
-    } catch (error) {
-      console.error('GitHub raw fetch error:', error)
-      return null
-    }
-  } else {
-    // Read from local file on Vercel/local
-    const dir = getDataDir(version)
-    const filepath = join(dir, filename)
-    if (!existsSync(filepath)) return null
-    return await readFileAsync(filepath, 'utf-8')
-  }
-}
-
-// Get list of snapshot files
-async function getSnapshotFiles(version: AnalyticsVersion): Promise<string[]> {
-  if (isNetlify) {
-    // Fetch index.json from GitHub
-    const indexContent = await fetchFileContent(version, 'index.json')
-    if (!indexContent) return []
-    try {
-      const files = JSON.parse(indexContent)
-      return files.filter(isSnapshotFileName)
-    } catch {
-      return []
-    }
-  } else {
-    // Read from local directory
-    const dir = getDataDir(version)
-    if (!existsSync(dir)) return []
-    const files = await readdirAsync(dir)
-    return files.filter(isSnapshotFileName).sort()
-  }
 }
 
 // Memory cache for fast access
@@ -139,19 +83,29 @@ export async function loadSnapshots(
     if (cached) return cached
   }
   
-  console.log(`Loading snapshots for version: ${version} (Netlify: ${isNetlify})`)
+  const dir = getDataDir(version)
+  console.log(`Loading snapshots from: ${dir}`)
+  console.log(`Directory exists: ${existsSync(dir)}`)
+  
+  if (!existsSync(dir)) {
+    console.log(`Directory does not exist: ${dir}`)
+    return []
+  }
   
   try {
-    const files = await getSnapshotFiles(version)
-    console.log(`Found ${files.length} snapshot files`)
+    const files = await readdirAsync(dir)
+    console.log(`Found ${files.length} files in directory`)
+    const snapshotFiles = files
+      .filter(isSnapshotFileName)
+      .sort()
+      .slice(-limit)
     
-    const snapshotFiles = files.slice(-limit)
+    console.log(`Snapshot files: ${snapshotFiles.length}`)
     
     const snapshots: StoredSnapshot[] = []
     for (const file of snapshotFiles) {
       try {
-        const content = await fetchFileContent(version, file)
-        if (!content) continue
+        const content = await readFileAsync(join(dir, file), 'utf-8')
         const snapshot = JSON.parse(content)
         if (isStoredSnapshot(snapshot)) {
           snapshots.push(snapshot)
@@ -170,8 +124,7 @@ export async function loadSnapshots(
     }
     
     return snapshots
-  } catch (error) {
-    console.error('Error loading snapshots:', error)
+  } catch {
     return []
   }
 }
