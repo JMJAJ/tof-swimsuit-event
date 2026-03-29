@@ -10,9 +10,8 @@ import { promisify } from 'util'
 const readdirAsync = promisify(readdir)
 const readFileAsync = promisify(readFile)
 
-// GitHub API URL for Netlify (avoids bundling large files)
-// Using API instead of raw URLs because raw URLs return LFS pointers for LFS-tracked files
-const GITHUB_API_BASE = 'https://api.github.com/repos/JMJAJ/tof-swimsuit-event/contents'
+// GitHub raw content URL for Netlify (avoids bundling large files)
+const GITHUB_RAW_BASE = 'https://raw.githubusercontent.com/JMJAJ/tof-swimsuit-event/main'
 const isNetlify = process.env.NETLIFY === 'true'
 
 export interface StoredSnapshot {
@@ -43,38 +42,26 @@ function getDataDir(version: AnalyticsVersion): string {
   return join(process.cwd(), 'public', folder)
 }
 
-// Get GitHub API URL for a file (handles LFS properly)
-function getGitHubApiUrl(version: AnalyticsVersion, filename: string): string {
+// Get GitHub raw URL for a file
+function getGitHubRawUrl(version: AnalyticsVersion, filename: string): string {
   const folder = version === 'v1' ? 'analytics-data' : `analytics-data-${version}`
-  return `${GITHUB_API_BASE}/public/${folder}/${filename}`
+  return `${GITHUB_RAW_BASE}/public/${folder}/${filename}`
 }
 
-// Fetch file content (from GitHub API on Netlify, local file otherwise)
+// Fetch file content (from GitHub raw on Netlify, local file otherwise)
 async function fetchFileContent(version: AnalyticsVersion, filename: string): Promise<string | null> {
   if (isNetlify) {
-    // Fetch from GitHub API on Netlify (handles LFS files properly)
-    const url = getGitHubApiUrl(version, filename)
+    // Fetch from GitHub raw URL on Netlify
+    const url = getGitHubRawUrl(version, filename)
     try {
-      const response = await fetch(url, {
-        headers: {
-          'Accept': 'application/vnd.github.v3+json',
-          'User-Agent': 'tof-swimsuit-event-app'
-        }
-      })
+      const response = await fetch(url)
       if (!response.ok) {
-        console.log(`GitHub API error: ${response.status} for ${url}`)
+        console.log(`GitHub raw error: ${response.status} for ${url}`)
         return null
       }
-      const data = await response.json()
-      // GitHub API returns content as base64
-      if (data.content && data.encoding === 'base64') {
-        // Decode base64 content
-        const decoded = Buffer.from(data.content, 'base64').toString('utf-8')
-        return decoded
-      }
-      return null
+      return await response.text()
     } catch (error) {
-      console.error('GitHub API fetch error:', error)
+      console.error('GitHub raw fetch error:', error)
       return null
     }
   } else {
