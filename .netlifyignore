@@ -1,0 +1,5 @@
+# Exclude analytics data from Netlify deploy to reduce function bundle size
+# These files are fetched from GitHub raw URLs on Netlify
+public/analytics-data-v2/
+public/analytics-data/
+analytics-data/

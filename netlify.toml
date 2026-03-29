@@ -1,5 +1,5 @@
 [build]
-  command = "npm run build"
+  command = "rm -rf public/analytics-data-v2 public/analytics-data analytics-data && npm run build"
   publish = ".next"
 
 [build.environment]
