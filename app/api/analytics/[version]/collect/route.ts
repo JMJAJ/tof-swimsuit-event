@@ -87,6 +87,10 @@ export async function POST(
       success: true,
       snapshot,
       snapshotId,
+    }, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400',
+      },
     })
   } catch (error) {
     console.error(`❌ ${versionKey} collection error:`, error)

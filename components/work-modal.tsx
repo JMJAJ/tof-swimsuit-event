@@ -29,21 +29,7 @@ export function WorkModal({ work, onClose }: WorkModalProps) {
 
   const currentImage = images[currentImageType] || images[0] || { url: "/placeholder.svg", width: 480, height: 480 }
 
-  // Preload all images for instant switching
-  const preloadImages = () => {
-    images.forEach((img) => {
-      const link = document.createElement('link')
-      link.rel = 'preload'
-      link.as = 'image'
-      link.href = img.url
-      document.head.appendChild(link)
-    })
-  }
-
-  // Preload images when modal opens
-  useEffect(() => {
-    preloadImages()
-  }, [])
+  // Removed aggressive preloading to reduce origin transfer
 
   // Keyboard navigation
   useEffect(() => {
@@ -122,7 +108,7 @@ export function WorkModal({ work, onClose }: WorkModalProps) {
               alt={work.name} 
               fill 
               className="object-contain transition-opacity duration-200" 
-              priority
+              loading="lazy"
             />
             
             {/* Navigation arrows */}
@@ -149,19 +135,7 @@ export function WorkModal({ work, onClose }: WorkModalProps) {
               </>
             )}
             
-            {/* Hidden preloaded images */}
-            {images.map((img, index) => (
-              index !== currentImageType && (
-                <Image
-                  key={index}
-                  src={img.url}
-                  alt={`${work.name} - ${index}`}
-                  fill
-                  className="object-contain opacity-0 pointer-events-none"
-                  priority
-                />
-              )
-            ))}
+            {/* Removed hidden preloaded images to reduce origin transfer */}
           </div>
 
           {/* Info Cards */}

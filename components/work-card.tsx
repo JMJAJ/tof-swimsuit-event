@@ -1,6 +1,6 @@
 "use client"
 
-// import Image from "next/image" // Disabled to save image optimization quota
+import Image from "next/image"
 import { Trophy, User, Server } from "lucide-react"
 import type { Work, ImageData } from "@/lib/data"
 import { getRegionAbbreviation } from "@/lib/servers"
@@ -36,11 +36,13 @@ export function WorkCard({ work, onClick, rank, globalRank, regionName }: WorkCa
     >
       {/* Compact Image Container */}
       <div className="relative aspect-[4/3] overflow-hidden bg-secondary">
-        <img
+        <Image
           src={previewImage.url || "/placeholder.svg"}
           alt={work.name}
-          className="absolute inset-0 w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+          fill
+          className="object-cover transition-transform duration-300 group-hover:scale-105"
           loading="lazy"
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
         />
 
         {/* Ranking Badge */}

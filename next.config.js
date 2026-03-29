@@ -26,10 +26,10 @@ module.exports = (phase) => {
     imageSizes: [180, 200, 240, 320],
 
     // Cache images for longer to reduce regeneration
-    minimumCacheTTL: 86400, // 24 hours
+    minimumCacheTTL: 604800, // 7 days for better CDN caching
 
     // Optimize formats
-    formats: ['image/webp', 'image/avif'],
+    formats: ['image/webp'],
 
     remotePatterns: [
       {
@@ -40,8 +40,9 @@ module.exports = (phase) => {
       },
     ],
 
-    // Disable image optimization to save quota
-    unoptimized: true
+    // Re-enable image optimization with conservative settings
+    // to leverage Vercel's CDN caching for remote images
+    unoptimized: false,
   },
 
   // Performance optimizations
